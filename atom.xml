@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>大华小屋</title>
+  <subtitle>越过山丘 才发现无人等候</subtitle>
+  <link href="/atom.xml" rel="self"/>
+  
+  <link href="https://dadahua.github.io/"/>
+  <updated>2016-11-27T08:14:26.000Z</updated>
+  <id>https://dadahua.github.io/</id>
+  
+  <author>
+    <name>大华</name>
+    
+  </author>
+  
+  <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>iOS UDP通讯</title>
+    <link href="https://dadahua.github.io/2015/07/30/hello-world/"/>
+    <id>https://dadahua.github.io/2015/07/30/hello-world/</id>
+    <published>2015-07-29T23:56:29.000Z</published>
+    <updated>2016-11-27T08:14:26.000Z</updated>
+    
+    <content type="html"><![CDATA[<h1 id="前言："><a href="#前言：" class="headerlink" title="前言："></a>前言：</h1><p>最近用<a href="https://github.com/robbiehanson/CocoaAsyncSocket" target="_blank" rel="external">GCDAsyncSocket</a>写个小东西，UDP通讯现在大多也使用GCD，很少用Runloop。然后粗略的了解了下UDP通讯。<br>它是比HTTP更加底层的通讯协议，特点是：<strong>传输快</strong>，<strong>无连接</strong>，系统开销也少。<br>更详细的基础知识：<a href="http://www.huangyibiao.com/archives/200" target="_blank" rel="external">Socket理论知识</a>。<br><strong>GCDAsyncUdpSocket</strong>这个框架很强大，你只需绑定端口通过<strong>代理</strong>接受消息，和对象方法发送消息。</p>
+<h1 id="Demo："><a href="#Demo：" class="headerlink" title="Demo："></a>Demo：</h1><p><img src="http://upload-images.jianshu.io/upload_images/1352811-e0315f87f985620d.gif?imageMogr2/auto-orient/strip" alt="TCP.gif"></p>
+<p>####简介</p>
+<ol>
+<li>第一个界面作为服务器端，绑定<strong>端口号</strong>，监听端口号里面的消息。</li>
+<li>第二个界面作为客户端发送消息，给服务器的<strong>端口号</strong>和局域网的<strong>IP</strong>地址，同时也绑定端口号，监听端口号里面消息。</li>
+<li>消息发送后，服务器通过代理接受到消息，消息里面包括客户端的IP地址·端口·发送的内容。</li>
+<li>服务器再在代理里面回复消息：“我收到了”，给客户端的<strong>IP</strong>地址·<strong>端口</strong>。</li>
+</ol>
+<h1 id="代码"><a href="#代码" class="headerlink" title="代码"></a>代码</h1><ul>
+<li>服务端</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div></pre></td><td class="code"><pre><div class="line">// 初始化socket</div><div class="line">-(void)initSocket &#123;</div><div class="line"></div><div class="line">self.title = @&quot;服务器&quot;;</div><div class="line">dispatch_queue_t dQueue = dispatch_queue_create(&quot;Server queue&quot;, NULL);</div><div class="line">receiveSocket = [[GCDAsyncUdpSocket alloc] initWithDelegate:self</div><div class="line">delegateQueue:dQueue];</div><div class="line">NSError *error;</div><div class="line"></div><div class="line">// 绑定一个端口(可选),如果不绑定端口, 那么就会随机产生一个随机的电脑唯一的端口</div><div class="line">// 端口数字范围(1024,2^16-1)</div><div class="line">[receiveSocket bindToPort:SERVERPORT error:&amp;error];</div><div class="line">if (error) &#123;</div><div class="line">NSLog(@&quot;服务器绑定失败&quot;);</div><div class="line">&#125;</div><div class="line">// 开始接收对方发来的消息</div><div class="line">[receiveSocket beginReceiving:nil];</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div></pre></td><td class="code"><pre><div class="line">// 接收消息代理</div><div class="line">-(void)udpSocket:(GCDAsyncUdpSocket *)sock didReceiveData:(NSData *)data fromAddress:(NSData *)address withFilterContext:(id)filterContext &#123;</div><div class="line"></div><div class="line">NSString *msg = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];</div><div class="line">/**</div><div class="line">*  更新UI一定要到主线程去操作啊</div><div class="line">*/</div><div class="line">dispatch_sync(dispatch_get_main_queue(), ^&#123;</div><div class="line">self.textView.text = msg;</div><div class="line">&#125;);</div><div class="line">NSLog(@&quot;客户端ip地址--&gt;%@,port---&gt;%u,内容--&gt;%@&quot;,</div><div class="line">[GCDAsyncUdpSocket hostFromAddress:address],</div><div class="line">[GCDAsyncUdpSocket portFromAddress:address],</div><div class="line">msg);</div><div class="line"></div><div class="line">NSString *sendStr = @&quot;我收到了&quot;;</div><div class="line">NSData *sendData = [sendStr dataUsingEncoding:NSUTF8StringEncoding];</div><div class="line">// 该函数只是启动一次发送 它本身不进行数据的发送, 而是让后台的线程慢慢的发送 也就是说这个函数调用完成后,数据并没有立刻发送,异步发送</div><div class="line">[receiveSocket sendData:sendData toHost:[GCDAsyncUdpSocket hostFromAddress:address]</div><div class="line">port:[GCDAsyncUdpSocket portFromAddress:address]</div><div class="line">withTimeout:60</div><div class="line">tag:500];</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<ul>
+<li>客户端<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line">-(void)viewDidLoad &#123;</div><div class="line">[super viewDidLoad];</div><div class="line">self.title = @&quot;客户端&quot;;</div><div class="line">dispatch_queue_t qQueue = dispatch_queue_create(&quot;Client queue&quot;, NULL);</div><div class="line">sendSocket = [[GCDAsyncUdpSocket alloc] initWithDelegate:self</div><div class="line">delegateQueue:qQueue];</div><div class="line">NSError *error;</div><div class="line">[sendSocket bindToPort:CLIENTPORT error:&amp;error];</div><div class="line">if (error) &#123;</div><div class="line">NSLog(@&quot;客户端绑定失败&quot;);</div><div class="line">&#125;</div><div class="line">[sendSocket beginReceiving:nil];</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+</li>
+</ul>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line">// 发送消息</div><div class="line">-(IBAction)sendMsgClick:(UIButton *)sender &#123;</div><div class="line">NSData *sendData = [msgTF.text dataUsingEncoding:NSUTF8StringEncoding];</div><div class="line">[sendSocket sendData:sendData</div><div class="line">toHost:ipTF.text</div><div class="line">port:SERVERPORT</div><div class="line">withTimeout:60</div><div class="line">tag:200];</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line">// 发送消息失败回调</div><div class="line">-(void)udpSocket:(GCDAsyncUdpSocket *)sock didNotSendDataWithTag:(long)tag dueToError:(NSError *)error &#123;</div><div class="line"></div><div class="line">if (tag == 200) &#123;</div><div class="line">NSLog(@&quot;client发送失败--&gt;%@&quot;,error);</div><div class="line">&#125;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div></pre></td><td class="code"><pre><div class="line">// 收到消息回调</div><div class="line">-(void)udpSocket:(GCDAsyncUdpSocket *)sock didReceiveData:(NSData *)data fromAddress:(NSData *)address withFilterContext:(id)filterContext &#123;</div><div class="line"></div><div class="line">NSString *receiveStr = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];</div><div class="line">NSLog(@&quot;服务器ip地址---&gt;%@,host---%u,内容---&gt;%@&quot;,</div><div class="line">[GCDAsyncUdpSocket hostFromAddress:address],</div><div class="line">[GCDAsyncUdpSocket portFromAddress:address],</div><div class="line">receiveStr);</div><div class="line"></div><div class="line">dispatch_sync(dispatch_get_main_queue(), ^&#123;</div><div class="line">receiveLab.text = receiveStr;</div><div class="line">&#125;);</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div></pre></td><td class="code"><pre><div class="line">// 关闭套接字，并销毁</div><div class="line">-(void)dealloc &#123;</div><div class="line"></div><div class="line">[sendSocket close];</div><div class="line">sendSocket = nil;</div><div class="line">&#125;</div></pre></td></tr></table></figure>
+<h1 id="要点"><a href="#要点" class="headerlink" title="要点"></a>要点</h1><ul>
+<li>收到消息的回调方法里面，如果要更新UI的话，一定要切换到<strong>主线程</strong>里去实现操作。</li>
+<li>向对方发消息，方法参数的端口号要是 <strong>对方</strong>绑定的端口号。</li>
+</ul>]]></content>
+    
+    <summary type="html">
+    
+      &lt;h1 id=&quot;前言：&quot;&gt;&lt;a href=&quot;#前言：&quot; class=&quot;headerlink&quot; title=&quot;前言：&quot;&gt;&lt;/a&gt;前言：&lt;/h1&gt;&lt;p&gt;最近用&lt;a href=&quot;https://github.com/robbiehanson/CocoaAsyncSocket&quot; targ
+    
+    </summary>
+    
+      <category term="hexo" scheme="https://dadahua.github.io/categories/hexo/"/>
+    
+    
+      <category term="hexo" scheme="https://dadahua.github.io/tags/hexo/"/>
+    
+      <category term="github" scheme="https://dadahua.github.io/tags/github/"/>
+    
+  </entry>
+  
+</feed>
